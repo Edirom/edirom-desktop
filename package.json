@@ -1,0 +1,20 @@
+{
+  "name": "edirom-desktop",
+  "version": "0.1.0",
+  "description": "Desktop shell for Edirom Online as web components: top bar, task bar and window management.",
+  "type": "module",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "main": "edirom-desktop.js",
+  "exports": {
+    ".": "./edirom-desktop.js",
+    "./layout": "./src/layout.js",
+    "./window-registry": "./src/window-registry.js"
+  },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
