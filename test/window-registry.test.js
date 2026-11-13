@@ -163,8 +163,8 @@ describe('WindowRegistry', () => {
 
         it('lists task bar items without hidden-in-taskbar windows', () => {
             assert.deepEqual(registry.getTaskbarItems().map((i) => ({ ...i })), [
-                { id: 'score', title: 'Score', icon: null, active: false, hidden: false, minimized: false },
-                { id: 'text', title: 'Text', icon: null, active: false, hidden: false, minimized: true }
+                { id: 'score', title: 'Score', icon: null, active: false, hidden: false, minimized: false, maximized: false },
+                { id: 'text', title: 'Text', icon: null, active: false, hidden: false, minimized: true, maximized: false }
             ]);
             assert.equal(registry.getActiveId(), 'search');
         });

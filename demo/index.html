@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>edirom-topbar / edirom-taskbar demo</title>
+    <script type="module" src="https://cdn.jsdelivr.net/gh/Edirom/edirom-core-web-components@7b6e1e6e3903fb405475561b90f2e036c1a310de/src/edirom-icon.js"></script>
+    <script type="module" src="../edirom-desktop.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            font: 13px/1.3 helvetica, arial, verdana, sans-serif;
+        }
+
+        main {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+            background: #4d6a8a;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            background: #eeeeee;
+            border-left: 1px solid #999999;
+        }
+
+        .controls button,
+        .controls select {
+            font: inherit;
+        }
+
+        aside {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            width: 300px;
+            background: #ffffff;
+            border-left: 1px solid #999999;
+        }
+
+        aside h2 {
+            margin: 0;
+            padding: 6px 8px;
+            font-size: 13px;
+            background: #eeeeee;
+            border-bottom: 1px solid #cccccc;
+        }
+
+        aside .controls {
+            flex-wrap: wrap;
+            border: 0;
+            border-bottom: 1px solid #cccccc;
+        }
+
+        #log {
+            flex: 1;
+            margin: 0;
+            padding: 0;
+            overflow-y: auto;
+            list-style: none;
+            font: 11px/1.4 ui-monospace, Menlo, monospace;
+        }
+
+        #log li {
+            padding: 3px 8px;
+            border-bottom: 1px solid #eeeeee;
+            word-break: break-all;
+        }
+
+        #log b {
+            color: #1a5aa6;
+        }
+
+        .win {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            background: #ffffff;
+            border: 1px solid #777777;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            transition: left 0.4s, top 0.4s, width 0.4s, height 0.4s;
+        }
+
+        .win.active {
+            border-color: #000000;
+        }
+
+        .win[hidden] {
+            display: none;
+        }
+
+        .win header {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 6px;
+            background: #cccccc;
+            cursor: default;
+        }
+
+        .win.active header {
+            background: #9fb7d0;
+        }
+
+        .win header span {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .win header button {
+            padding: 0 6px;
+            font: inherit;
+        }
+
+        .win .body {
+            flex: 1;
+            padding: 8px;
+            color: #555555;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <edirom-topbar
+        works='[{"id":"freischuetz","title":"Der Freischütz"},{"id":"oberon","title":"Oberon"},{"id":"euryanthe","title":"Euryanthe"}]'
+        active-work="freischuetz">
+        <div slot="actions" class="controls">slot="actions"</div>
+    </edirom-topbar>
+
+    <main id="desktop">
+        <aside>
+            <h2>Demo controls</h2>
+            <div class="controls">
+                <button id="add-window" type="button">Add window</button>
+                <label><input id="show-clock" type="checkbox" checked> Clock</label>
+                <label><input id="show-language" type="checkbox"> Language button</label>
+                <select id="language" aria-label="Labels">
+                    <option value="en">English labels</option>
+                    <option value="de">German labels</option>
+                </select>
+                <button id="clear-log" type="button">Clear log</button>
+            </div>
+            <h2>Events</h2>
+            <ol id="log"></ol>
+        </aside>
+    </main>
+
+    <edirom-taskbar show-clock></edirom-taskbar>
+
+    <script type="module">
+        import { WindowRegistry, getUsableSize } from '../edirom-desktop.js';
+
+        const topbar = document.querySelector('edirom-topbar');
+        const taskbar = document.querySelector('edirom-taskbar');
+        const desktop = document.getElementById('desktop');
+        const aside = document.querySelector('aside');
+        const log = document.getElementById('log');
+        const registry = new WindowRegistry();
+        const windowElements = new Map();
+
+        const GERMAN = {
+            topbar: {
+                home: 'Startseite', workSwitch: 'Werk auswählen', searchField: 'Suchbegriff', search: 'Suchen'
+            },
+            taskbar: {
+                sortGrid: 'Fenster im Raster anordnen', sortVertical: 'Fenster untereinander anordnen',
+                sortHorizontal: 'Fenster nebeneinander anordnen', showMeasures: 'Taktzahlen anzeigen',
+                showAnnotations: 'Anmerkungen anzeigen', concordanceNav: 'Konkordanznavigator',
+                windowBar: 'Geöffnete Fenster', about: 'Über', help: 'Hilfe', languageSwitch: 'Sprache wechseln',
+                windowMenu: 'Fensteraktionen', restore: 'Wiederherstellen', minimize: 'Minimieren',
+                maximize: 'Maximieren', close: 'Schließen', closeOther: 'Andere Fenster schließen',
+                closeAll: 'Alle Fenster schließen'
+            }
+        };
+
+        const EVENTS = [
+            'home-request', 'work-select', 'search-request',
+            'sort-windows-request', 'toggle-measures-global', 'toggle-annotations-global',
+            'concordance-navigator-toggle-request', 'open-about-request', 'open-help-request', 'language-switch-request',
+            'window-focus-request', 'window-minimize-request', 'window-restore-request',
+            'window-maximize-request', 'window-close-request'
+        ];
+
+        for (const type of EVENTS) {
+            document.addEventListener(type, (event) => {
+                const item = document.createElement('li');
+                const name = document.createElement('b');
+                name.textContent = type;
+                item.append(name, ' ', event.detail === null ? '' : JSON.stringify(event.detail));
+                log.prepend(item);
+            });
+        }
+
+        function usableSize() {
+            return getUsableSize(
+                { width: desktop.clientWidth, height: desktop.clientHeight },
+                { navigatorWidth: aside.offsetWidth }
+            );
+        }
+
+        let counter = 0;
+        function addWindow({ id = `window-${++counter}`, title = `Window ${counter}`, special = false, hidden = false } = {}) {
+            const rect = special
+                ? { x: usableSize().width - 260, y: 10, width: 250, height: 160 }
+                : registry.getSizeAndPosition(usableSize());
+            registry.register({ id, title, special, hiddenInTaskbar: special, hidden, rect, icon: special ? 'sync_alt' : 'description' });
+        }
+
+        function renderWindows() {
+            const zOrder = registry.getZOrder().map((w) => w.id);
+
+            for (const [id, element] of windowElements) {
+                if (!registry.has(id)) {
+                    element.remove();
+                    windowElements.delete(id);
+                }
+            }
+
+            for (const win of registry.getAll()) {
+                let element = windowElements.get(win.id);
+                if (!element) {
+                    element = document.createElement('section');
+                    element.className = 'win';
+                    element.innerHTML = `
+                        <header>
+                            <span></span>
+                            <button type="button" data-do="minimize" title="Minimize">_</button>
+                            <button type="button" data-do="maximize" title="Maximize / restore">□</button>
+                            <button type="button" data-do="close" title="Close">×</button>
+                        </header>
+                        <div class="body">Fake window standing in for an ExtJS window.</div>`;
+                    element.addEventListener('pointerdown', () => registry.setActive(win.id));
+                    element.querySelector('header').addEventListener('click', (event) => {
+                        const action = event.target.dataset.do;
+                        const current = registry.get(win.id);
+                        if (action === 'minimize') registry.update(win.id, { minimized: true });
+                        if (action === 'maximize') registry.update(win.id, { maximized: !current.maximized });
+                        if (action === 'close') closeWindows([win.id]);
+                    });
+                    desktop.insertBefore(element, aside);
+                    windowElements.set(win.id, element);
+                }
+
+                const rect = win.maximized
+                    ? { x: 0, y: 0, width: usableSize().width, height: desktop.clientHeight }
+                    : win.rect;
+                element.querySelector('header span').textContent = win.title;
+                element.hidden = win.hidden || win.minimized;
+                element.classList.toggle('active', registry.getActiveId() === win.id);
+                element.style.left = `${rect.x}px`;
+                element.style.top = `${rect.y}px`;
+                element.style.width = `${rect.width}px`;
+                element.style.height = `${rect.height}px`;
+                element.style.zIndex = String(zOrder.indexOf(win.id) + 1);
+            }
+
+            taskbar.windows = registry.getTaskbarItems();
+            taskbar.concordanceNavigatorOpen = registry.isVisible('concordance');
+        }
+
+        function closeWindows(ids) {
+            for (const id of ids) {
+                if (registry.get(id)?.special) registry.update(id, { hidden: true });
+                else registry.unregister(id);
+            }
+        }
+
+        registry.addEventListener('change', renderWindows);
+
+        document.addEventListener('window-focus-request', (e) => registry.setActive(e.detail.id));
+        document.addEventListener('window-minimize-request', (e) => registry.update(e.detail.id, { minimized: true }));
+        document.addEventListener('window-restore-request', (e) => {
+            registry.update(e.detail.id, { maximized: false });
+            registry.setActive(e.detail.id);
+        });
+        document.addEventListener('window-maximize-request', (e) => {
+            registry.update(e.detail.id, { maximized: true });
+            registry.setActive(e.detail.id);
+        });
+        document.addEventListener('window-close-request', (e) => {
+            const { scope, id } = e.detail;
+            const ids = scope === 'window' ? [id]
+                : registry.getAll().map((w) => w.id).filter((other) => scope === 'all' || other !== id);
+            closeWindows(ids);
+        });
+        document.addEventListener('sort-windows-request', (e) => {
+            const rects = registry.getSortRects(e.detail.mode, usableSize(), { x: 0, y: 0 });
+            for (const [id, rect] of Object.entries(rects)) registry.update(id, { rect });
+        });
+        document.addEventListener('concordance-navigator-toggle-request', () => {
+            if (registry.isVisible('concordance')) registry.update('concordance', { hidden: true });
+            else registry.setActive('concordance');
+        });
+
+        document.getElementById('add-window').addEventListener('click', () => addWindow());
+        document.getElementById('clear-log').addEventListener('click', () => log.replaceChildren());
+        document.getElementById('show-clock').addEventListener('change', (e) => taskbar.toggleAttribute('show-clock', e.target.checked));
+        document.getElementById('show-language').addEventListener('change', (e) => taskbar.toggleAttribute('show-language-switch', e.target.checked));
+        document.getElementById('language').addEventListener('change', (e) => {
+            const german = e.target.value === 'de';
+            document.documentElement.lang = e.target.value;
+            taskbar.setAttribute('lang', e.target.value);
+            topbar.labels = german ? GERMAN.topbar : {};
+            taskbar.labels = german ? GERMAN.taskbar : {};
+        });
+
+        addWindow({ id: 'concordance', title: 'Concordance navigator', special: true, hidden: true });
+        addWindow({ title: 'Score: Freischütz' });
+        addWindow({ title: 'Edition text' });
+        addWindow({ title: 'Facsimile with a rather long title' });
+    </script>
+</body>
+</html>

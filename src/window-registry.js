@@ -143,7 +143,8 @@ export class WindowRegistry extends EventTarget {
                 icon: entry.icon,
                 active: entry.id === this.#activeId,
                 hidden: entry.hidden,
-                minimized: entry.minimized
+                minimized: entry.minimized,
+                maximized: entry.maximized
             }));
     }
 
