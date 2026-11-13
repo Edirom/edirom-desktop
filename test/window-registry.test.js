@@ -25,6 +25,7 @@ describe('WindowRegistry', () => {
                 id: 'w1',
                 title: 'Score',
                 icon: null,
+                kind: null,
                 special: false,
                 hiddenInTaskbar: false,
                 hidden: false,
@@ -34,6 +35,18 @@ describe('WindowRegistry', () => {
             });
             assert.equal(registry.size, 1);
             assert.equal(registry.has('w1'), true);
+        });
+
+        it('finds windows by kind', () => {
+            registry.register({ id: 'w1' });
+            registry.register({ id: 'cn', kind: 'concordance-navigator', special: true });
+            registry.register({ id: 'help', kind: 'help', special: true });
+
+            assert.deepEqual(registry.getAll({ kind: 'concordance-navigator' }).map((w) => w.id), ['cn']);
+            assert.deepEqual(registry.getAll({ kind: null }).map((w) => w.id), ['w1']);
+
+            registry.update('help', { kind: 'about' });
+            assert.equal(registry.get('help').kind, 'about');
         });
 
         it('rejects missing and duplicate ids', () => {

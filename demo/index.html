@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>edirom-topbar / edirom-taskbar demo</title>
+    <title>edirom-desktop demo</title>
     <script type="module" src="https://cdn.jsdelivr.net/gh/Edirom/edirom-core-web-components@7b6e1e6e3903fb405475561b90f2e036c1a310de/src/edirom-icon.js"></script>
     <script type="module" src="../edirom-desktop.js"></script>
     <style>
@@ -14,40 +14,35 @@
 
         body {
             display: flex;
-            flex-direction: column;
             font: 13px/1.3 helvetica, arial, verdana, sans-serif;
         }
 
-        main {
-            position: relative;
+        edirom-desktop {
             flex: 1;
-            overflow: hidden;
-            background: #4d6a8a;
+            min-width: 0;
         }
 
-        .controls {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 8px;
-            font-size: 12px;
-            background: #eeeeee;
+        .fake-navigator {
+            box-sizing: border-box;
+            width: 250px;
+            height: 500px;
+            padding: 8px;
+            background: #ffffff;
             border-left: 1px solid #999999;
+            border-bottom: 1px solid #999999;
+            color: #555555;
+            overflow: auto;
+            resize: vertical;
         }
 
-        .controls button,
-        .controls select {
+        .action {
             font: inherit;
         }
 
         aside {
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
             display: flex;
             flex-direction: column;
-            width: 300px;
+            flex: 0 0 300px;
             background: #ffffff;
             border-left: 1px solid #999999;
         }
@@ -60,9 +55,25 @@
             border-bottom: 1px solid #cccccc;
         }
 
-        aside .controls {
+        .controls {
+            display: flex;
             flex-wrap: wrap;
-            border: 0;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-bottom: 1px solid #cccccc;
+        }
+
+        .controls button,
+        .controls select {
+            font: inherit;
+        }
+
+        #metrics {
+            margin: 0;
+            padding: 4px 8px;
+            font: 11px/1.4 ui-monospace, Menlo, monospace;
             border-bottom: 1px solid #cccccc;
         }
 
@@ -138,56 +149,58 @@
     </style>
 </head>
 <body>
-    <edirom-topbar
+    <edirom-desktop
         works='[{"id":"freischuetz","title":"Der Freischütz"},{"id":"oberon","title":"Oberon"},{"id":"euryanthe","title":"Euryanthe"}]'
-        active-work="freischuetz">
-        <div slot="actions" class="controls">slot="actions"</div>
-    </edirom-topbar>
+        active-work="freischuetz"
+        show-clock>
+        <div slot="workspace" id="workspace"></div>
+        <div slot="navigator" class="fake-navigator">slot="navigator" (stands in for edirom-navigator, drag the corner to resize)</div>
+        <button slot="topbar-actions" type="button" class="action">slot="topbar-actions"</button>
+    </edirom-desktop>
 
-    <main id="desktop">
-        <aside>
-            <h2>Demo controls</h2>
-            <div class="controls">
-                <button id="add-window" type="button">Add window</button>
-                <label><input id="show-clock" type="checkbox" checked> Clock</label>
-                <label><input id="show-language" type="checkbox"> Language button</label>
-                <select id="language" aria-label="Labels">
-                    <option value="en">English labels</option>
-                    <option value="de">German labels</option>
-                </select>
-                <button id="clear-log" type="button">Clear log</button>
-            </div>
-            <h2>Events</h2>
-            <ol id="log"></ol>
-        </aside>
-    </main>
-
-    <edirom-taskbar show-clock></edirom-taskbar>
+    <aside>
+        <h2>Demo controls</h2>
+        <div class="controls">
+            <button id="add-window" type="button">Add window</button>
+            <button id="toggle-navigator" type="button">Toggle navigator</button>
+            <label><input id="show-clock" type="checkbox" checked> Clock</label>
+            <label><input id="show-language" type="checkbox"> Language button</label>
+            <label><input id="stretch" type="checkbox"> Stretch wallpaper</label>
+            <select id="wallpaper" aria-label="Wallpaper">
+                <option value="">Default background</option>
+                <option value="wallpaper.svg">Tiled pattern</option>
+            </select>
+            <select id="language" aria-label="Labels">
+                <option value="en">English labels</option>
+                <option value="de">German labels</option>
+            </select>
+            <button id="clear-log" type="button">Clear log</button>
+        </div>
+        <h2>desktop-resize</h2>
+        <pre id="metrics"></pre>
+        <h2>Events</h2>
+        <ol id="log"></ol>
+    </aside>
 
     <script type="module">
-        import { WindowRegistry, getUsableSize } from '../edirom-desktop.js';
+        import { CONCORDANCE_NAVIGATOR_KIND } from '../edirom-desktop.js';
 
-        const topbar = document.querySelector('edirom-topbar');
-        const taskbar = document.querySelector('edirom-taskbar');
-        const desktop = document.getElementById('desktop');
-        const aside = document.querySelector('aside');
+        const desktop = document.querySelector('edirom-desktop');
+        const workspace = document.getElementById('workspace');
+        const navigator = document.querySelector('.fake-navigator');
         const log = document.getElementById('log');
-        const registry = new WindowRegistry();
         const windowElements = new Map();
+        let zIndex = 0;
 
         const GERMAN = {
-            topbar: {
-                home: 'Startseite', workSwitch: 'Werk auswählen', searchField: 'Suchbegriff', search: 'Suchen'
-            },
-            taskbar: {
-                sortGrid: 'Fenster im Raster anordnen', sortVertical: 'Fenster untereinander anordnen',
-                sortHorizontal: 'Fenster nebeneinander anordnen', showMeasures: 'Taktzahlen anzeigen',
-                showAnnotations: 'Anmerkungen anzeigen', concordanceNav: 'Konkordanznavigator',
-                windowBar: 'Geöffnete Fenster', about: 'Über', help: 'Hilfe', languageSwitch: 'Sprache wechseln',
-                windowMenu: 'Fensteraktionen', restore: 'Wiederherstellen', minimize: 'Minimieren',
-                maximize: 'Maximieren', close: 'Schließen', closeOther: 'Andere Fenster schließen',
-                closeAll: 'Alle Fenster schließen'
-            }
+            home: 'Startseite', workSwitch: 'Werk auswählen', searchField: 'Suchbegriff', search: 'Suchen',
+            sortGrid: 'Fenster im Raster anordnen', sortVertical: 'Fenster untereinander anordnen',
+            sortHorizontal: 'Fenster nebeneinander anordnen', showMeasures: 'Taktzahlen anzeigen',
+            showAnnotations: 'Anmerkungen anzeigen', concordanceNav: 'Konkordanznavigator',
+            windowBar: 'Geöffnete Fenster', about: 'Über', help: 'Hilfe', languageSwitch: 'Sprache wechseln',
+            windowMenu: 'Fensteraktionen', restore: 'Wiederherstellen', minimize: 'Minimieren',
+            maximize: 'Maximieren', close: 'Schließen', closeOther: 'Andere Fenster schließen',
+            closeAll: 'Alle Fenster schließen'
         };
 
         const EVENTS = [
@@ -195,7 +208,7 @@
             'sort-windows-request', 'toggle-measures-global', 'toggle-annotations-global',
             'concordance-navigator-toggle-request', 'open-about-request', 'open-help-request', 'language-switch-request',
             'window-focus-request', 'window-minimize-request', 'window-restore-request',
-            'window-maximize-request', 'window-close-request'
+            'window-maximize-request', 'window-close-request', 'active-window-change'
         ];
 
         for (const type of EVENTS) {
@@ -208,32 +221,37 @@
             });
         }
 
-        function usableSize() {
-            return getUsableSize(
-                { width: desktop.clientWidth, height: desktop.clientHeight },
-                { navigatorWidth: aside.offsetWidth }
-            );
-        }
+        desktop.addEventListener('desktop-resize', (event) => {
+            document.getElementById('metrics').textContent = JSON.stringify(event.detail, null, 1);
+        });
+
+        desktop.addEventListener('active-window-change', (event) => {
+            const element = windowElements.get(event.detail.id);
+            if (element) element.style.zIndex = String(++zIndex);
+        });
 
         let counter = 0;
-        function addWindow({ id = `window-${++counter}`, title = `Window ${counter}`, special = false, hidden = false } = {}) {
+        function addWindow({ id = `window-${++counter}`, title = `Window ${counter}`, kind = null, special = false, hidden = false } = {}) {
+            const usable = desktop.getUsableSize();
             const rect = special
-                ? { x: usableSize().width - 260, y: 10, width: 250, height: 160 }
-                : registry.getSizeAndPosition(usableSize());
-            registry.register({ id, title, special, hiddenInTaskbar: special, hidden, rect, icon: special ? 'sync_alt' : 'description' });
+                ? { x: usable.width - 260, y: 10, width: 250, height: 160 }
+                : desktop.getSizeAndPosition();
+            desktop.registerWindow({ id, title, kind, special, hiddenInTaskbar: special, hidden, rect, icon: special ? 'sync_alt' : 'description' });
+            render();
         }
 
-        function renderWindows() {
-            const zOrder = registry.getZOrder().map((w) => w.id);
-
+        function render() {
             for (const [id, element] of windowElements) {
-                if (!registry.has(id)) {
+                if (!desktop.hasWindow(id)) {
                     element.remove();
                     windowElements.delete(id);
                 }
             }
 
-            for (const win of registry.getAll()) {
+            const activeId = desktop.getActiveWindow()?.id;
+            const usable = desktop.getUsableSize();
+
+            for (const win of desktop.getWindows()) {
                 let element = windowElements.get(win.id);
                 if (!element) {
                     element = document.createElement('section');
@@ -245,83 +263,80 @@
                             <button type="button" data-do="maximize" title="Maximize / restore">□</button>
                             <button type="button" data-do="close" title="Close">×</button>
                         </header>
-                        <div class="body">Fake window standing in for an ExtJS window.</div>`;
-                    element.addEventListener('pointerdown', () => registry.setActive(win.id));
+                        <div class="body">Fake window standing in for an ExtJS window, rendered into slot="workspace".</div>`;
+                    element.style.zIndex = String(++zIndex);
+                    element.addEventListener('pointerdown', () => { desktop.setActiveWindow(win.id); render(); });
                     element.querySelector('header').addEventListener('click', (event) => {
                         const action = event.target.dataset.do;
-                        const current = registry.get(win.id);
-                        if (action === 'minimize') registry.update(win.id, { minimized: true });
-                        if (action === 'maximize') registry.update(win.id, { maximized: !current.maximized });
+                        const current = desktop.getWindow(win.id);
+                        if (action === 'minimize') desktop.updateWindow(win.id, { minimized: true });
+                        if (action === 'maximize') desktop.updateWindow(win.id, { maximized: !current.maximized });
                         if (action === 'close') closeWindows([win.id]);
+                        render();
                     });
-                    desktop.insertBefore(element, aside);
+                    workspace.append(element);
                     windowElements.set(win.id, element);
                 }
 
                 const rect = win.maximized
-                    ? { x: 0, y: 0, width: usableSize().width, height: desktop.clientHeight }
+                    ? { x: 0, y: 0, width: usable.width, height: usable.height + 10 }
                     : win.rect;
                 element.querySelector('header span').textContent = win.title;
                 element.hidden = win.hidden || win.minimized;
-                element.classList.toggle('active', registry.getActiveId() === win.id);
-                element.style.left = `${rect.x}px`;
-                element.style.top = `${rect.y}px`;
-                element.style.width = `${rect.width}px`;
-                element.style.height = `${rect.height}px`;
-                element.style.zIndex = String(zOrder.indexOf(win.id) + 1);
+                element.classList.toggle('active', activeId === win.id);
+                Object.assign(element.style, {
+                    left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px`
+                });
             }
-
-            taskbar.windows = registry.getTaskbarItems();
-            taskbar.concordanceNavigatorOpen = registry.isVisible('concordance');
         }
 
         function closeWindows(ids) {
             for (const id of ids) {
-                if (registry.get(id)?.special) registry.update(id, { hidden: true });
-                else registry.unregister(id);
+                if (desktop.getWindow(id)?.special) desktop.updateWindow(id, { hidden: true });
+                else desktop.unregisterWindow(id);
             }
         }
 
-        registry.addEventListener('change', renderWindows);
+        function on(type, handler) {
+            desktop.addEventListener(type, (event) => { handler(event.detail); render(); });
+        }
 
-        document.addEventListener('window-focus-request', (e) => registry.setActive(e.detail.id));
-        document.addEventListener('window-minimize-request', (e) => registry.update(e.detail.id, { minimized: true }));
-        document.addEventListener('window-restore-request', (e) => {
-            registry.update(e.detail.id, { maximized: false });
-            registry.setActive(e.detail.id);
+        on('window-focus-request', ({ id }) => desktop.setActiveWindow(id));
+        on('window-minimize-request', ({ id }) => desktop.updateWindow(id, { minimized: true }));
+        on('window-restore-request', ({ id }) => {
+            desktop.updateWindow(id, { maximized: false });
+            desktop.setActiveWindow(id);
         });
-        document.addEventListener('window-maximize-request', (e) => {
-            registry.update(e.detail.id, { maximized: true });
-            registry.setActive(e.detail.id);
+        on('window-maximize-request', ({ id }) => {
+            desktop.updateWindow(id, { maximized: true });
+            desktop.setActiveWindow(id);
         });
-        document.addEventListener('window-close-request', (e) => {
-            const { scope, id } = e.detail;
-            const ids = scope === 'window' ? [id]
-                : registry.getAll().map((w) => w.id).filter((other) => scope === 'all' || other !== id);
-            closeWindows(ids);
+        on('window-close-request', ({ ids }) => closeWindows(ids));
+        on('sort-windows-request', ({ rects }) => {
+            for (const [id, rect] of Object.entries(rects)) desktop.updateWindow(id, { rect });
         });
-        document.addEventListener('sort-windows-request', (e) => {
-            const rects = registry.getSortRects(e.detail.mode, usableSize(), { x: 0, y: 0 });
-            for (const [id, rect] of Object.entries(rects)) registry.update(id, { rect });
+        on('concordance-navigator-toggle-request', () => {
+            if (desktop.concordanceNavigatorOpen) desktop.updateWindow('concordance', { hidden: true });
+            else desktop.setActiveWindow('concordance');
         });
-        document.addEventListener('concordance-navigator-toggle-request', () => {
-            if (registry.isVisible('concordance')) registry.update('concordance', { hidden: true });
-            else registry.setActive('concordance');
-        });
+        desktop.addEventListener('desktop-resize', render);
 
         document.getElementById('add-window').addEventListener('click', () => addWindow());
+        document.getElementById('toggle-navigator').addEventListener('click', () => {
+            if (navigator.isConnected) navigator.remove();
+            else desktop.append(navigator);
+        });
         document.getElementById('clear-log').addEventListener('click', () => log.replaceChildren());
-        document.getElementById('show-clock').addEventListener('change', (e) => taskbar.toggleAttribute('show-clock', e.target.checked));
-        document.getElementById('show-language').addEventListener('change', (e) => taskbar.toggleAttribute('show-language-switch', e.target.checked));
+        document.getElementById('show-clock').addEventListener('change', (e) => { desktop.showClock = e.target.checked; });
+        document.getElementById('show-language').addEventListener('change', (e) => desktop.toggleAttribute('show-language-switch', e.target.checked));
+        document.getElementById('stretch').addEventListener('change', (e) => { desktop.wallpaperStretch = e.target.checked; });
+        document.getElementById('wallpaper').addEventListener('change', (e) => { desktop.wallpaper = e.target.value || null; });
         document.getElementById('language').addEventListener('change', (e) => {
-            const german = e.target.value === 'de';
-            document.documentElement.lang = e.target.value;
-            taskbar.setAttribute('lang', e.target.value);
-            topbar.labels = german ? GERMAN.topbar : {};
-            taskbar.labels = german ? GERMAN.taskbar : {};
+            desktop.lang = e.target.value;
+            desktop.labels = e.target.value === 'de' ? GERMAN : {};
         });
 
-        addWindow({ id: 'concordance', title: 'Concordance navigator', special: true, hidden: true });
+        addWindow({ id: 'concordance', title: 'Concordance navigator', kind: CONCORDANCE_NAVIGATOR_KIND, special: true, hidden: true });
         addWindow({ title: 'Score: Freischütz' });
         addWindow({ title: 'Edition text' });
         addWindow({ title: 'Facsimile with a rather long title' });

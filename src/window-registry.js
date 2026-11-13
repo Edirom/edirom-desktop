@@ -1,7 +1,8 @@
 import { getLayout, getSizeAndPosition } from './layout.js';
 
 const FLAGS = ['hidden', 'minimized', 'maximized'];
-const DESCRIPTORS = ['title', 'icon', 'special', 'hiddenInTaskbar'];
+const DESCRIPTORS = ['title', 'icon', 'kind', 'special', 'hiddenInTaskbar'];
+const STRING_DESCRIPTORS = ['title', 'icon', 'kind'];
 
 function snapshot(entry) {
     return Object.freeze({ ...entry, rect: entry.rect ? Object.freeze({ ...entry.rect }) : null });
@@ -26,7 +27,7 @@ export class WindowRegistry extends EventTarget {
     #zOrder = [];
     #activeId = null;
 
-    register({ id, title = '', icon = null, special = false, hiddenInTaskbar = false, hidden = false, minimized = false, maximized = false, rect = null }) {
+    register({ id, title = '', icon = null, kind = null, special = false, hiddenInTaskbar = false, hidden = false, minimized = false, maximized = false, rect = null }) {
         if (id === undefined || id === null || id === '') {
             throw new TypeError('registerWindow requires an id');
         }
@@ -38,6 +39,7 @@ export class WindowRegistry extends EventTarget {
             id,
             title,
             icon,
+            kind,
             special: Boolean(special),
             hiddenInTaskbar: Boolean(hiddenInTaskbar),
             hidden: Boolean(hidden),
@@ -63,7 +65,7 @@ export class WindowRegistry extends EventTarget {
         const entry = this.#require(id);
 
         for (const key of DESCRIPTORS) {
-            if (key in patch) entry[key] = key === 'title' || key === 'icon' ? patch[key] : Boolean(patch[key]);
+            if (key in patch) entry[key] = STRING_DESCRIPTORS.includes(key) ? patch[key] : Boolean(patch[key]);
         }
         for (const key of FLAGS) {
             if (key in patch) entry[key] = Boolean(patch[key]);
@@ -119,11 +121,12 @@ export class WindowRegistry extends EventTarget {
     }
 
     /** Windows in registration order. */
-    getAll({ excludeSpecial = false, excludeMinimized = false } = {}) {
+    getAll({ excludeSpecial = false, excludeMinimized = false, kind } = {}) {
         const result = [];
         for (const entry of this.#windows.values()) {
             if (excludeSpecial && entry.special) continue;
             if (excludeMinimized && entry.minimized) continue;
+            if (kind !== undefined && entry.kind !== kind) continue;
             result.push(snapshot(entry));
         }
         return result;
