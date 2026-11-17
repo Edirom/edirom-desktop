@@ -90,7 +90,7 @@ template.innerHTML = `
         gap: 6px;
         min-width: 0;
         max-width: 40ch;
-        height: 24px;
+        min-height: 24px;
         padding: 0 6px 0 8px;
         border: 1px solid #949393;
         border-radius: 3px;
@@ -123,7 +123,7 @@ template.innerHTML = `
     .search-field {
         box-sizing: border-box;
         width: var(--edirom-topbar-search-width, 180px);
-        height: 22px;
+        min-height: 22px;
         padding: 2px 4px;
         border: 1px solid #b5b8c8;
         background: #ffffff;
@@ -139,7 +139,7 @@ template.innerHTML = `
 
     ${MENU_STYLES}
 </style>
-<div class="bar" part="bar">
+<div class="bar" part="bar" role="banner">
     <div class="start">
         <button type="button" class="home" part="home-button">
             <slot name="logo"><edirom-icon name="home"></edirom-icon></slot>
@@ -180,6 +180,7 @@ export class EdiromTopbar extends HTMLElement {
         shadow.append(template.content.cloneNode(true));
 
         this.#elements = {
+            bar: shadow.querySelector('.bar'),
             home: shadow.querySelector('.home'),
             homeLabel: shadow.querySelector('.home-label'),
             logoSlot: shadow.querySelector('slot[name="logo"]'),
@@ -285,8 +286,9 @@ export class EdiromTopbar extends HTMLElement {
 
     #render() {
         const labels = this.#labels;
-        const { home, homeLabel, logoSlot, workSwitch, workTitle, searchField, searchButton } = this.#elements;
+        const { bar, home, homeLabel, logoSlot, workSwitch, workTitle, searchField, searchButton } = this.#elements;
 
+        bar.setAttribute('aria-label', labels.topbar);
         home.setAttribute('aria-label', labels.home);
         home.title = labels.home;
         homeLabel.textContent = labels.homeLabel;
@@ -307,6 +309,8 @@ export class EdiromTopbar extends HTMLElement {
         const active = this.#works.find((work) => work.id === activeWork);
         workTitle.textContent = active ? active.title : labels.workSwitch;
         workSwitch.title = labels.workSwitch;
+        if (active) workSwitch.setAttribute('aria-label', `${labels.workSwitch}: ${active.title}`);
+        else workSwitch.removeAttribute('aria-label');
         workSwitch.hidden = this.#works.length === 0;
         this.shadowRoot.querySelector('.separator').hidden = this.#works.length === 0;
 

@@ -1,4 +1,5 @@
-import { THEME_TOKENS, parseJson, dispatch, toggleAttribute } from './shared.js';
+import { THEME_TOKENS, parseJson, mergeLabels, dispatch, toggleAttribute } from './shared.js';
+import { DESKTOP_LABELS } from './labels.js';
 import { WindowRegistry } from './window-registry.js';
 import { getUsableSize, getLayout } from './layout.js';
 import { CONCORDANCE_NAVIGATOR_KIND, FORWARDED_ATTRIBUTES, isKindVisible, closeRequestIds, sameMetrics, cssUrl } from './desktop-state.js';
@@ -84,7 +85,7 @@ template.innerHTML = `
 <edirom-topbar part="topbar"><slot name="topbar-actions" slot="actions"></slot></edirom-topbar>
 <div class="surface" part="surface">
     <div class="wallpaper" part="wallpaper"></div>
-    <div class="workspace" part="workspace"><slot name="workspace"></slot></div>
+    <div class="workspace" part="workspace" role="main"><slot name="workspace"></slot></div>
     <div class="navigator" part="navigator" hidden><slot name="navigator"></slot></div>
 </div>
 <edirom-taskbar part="taskbar"></edirom-taskbar>
@@ -122,6 +123,7 @@ export class EdiromDesktop extends HTMLElement {
             taskbar: shadow.querySelector('edirom-taskbar'),
             surface: shadow.querySelector('.surface'),
             wallpaper: shadow.querySelector('.wallpaper'),
+            workspace: shadow.querySelector('.workspace'),
             navigator: shadow.querySelector('.navigator'),
             navigatorSlot: shadow.querySelector('slot[name="navigator"]')
         };
@@ -150,6 +152,7 @@ export class EdiromDesktop extends HTMLElement {
     }
 
     connectedCallback() {
+        this.#syncLabels();
         this.#syncLang();
         this.#syncWindows();
 
@@ -177,6 +180,7 @@ export class EdiromDesktop extends HTMLElement {
             this.#syncLang();
             return;
         }
+        if (name === 'labels') this.#syncLabels();
         for (const [bar, names] of Object.entries(FORWARDED_ATTRIBUTES)) {
             if (names.includes(name)) forwardAttribute(this.#elements[bar], name, newValue);
         }
@@ -261,6 +265,11 @@ export class EdiromDesktop extends HTMLElement {
         const { taskbar } = this.#elements;
         taskbar.windows = this.#registry.getTaskbarItems();
         taskbar.concordanceNavigatorOpen = this.concordanceNavigatorOpen;
+    }
+
+    #syncLabels() {
+        const labels = mergeLabels(DESKTOP_LABELS, this.getAttribute('labels'));
+        this.#elements.workspace.setAttribute('aria-label', labels.workspace);
     }
 
     #syncLang() {

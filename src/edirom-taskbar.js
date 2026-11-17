@@ -92,13 +92,14 @@ template.innerHTML = `
     }
 
     .task {
+        position: relative;
         display: flex;
         flex: 0 0 var(--edirom-taskbar-button-width, 140px);
         min-width: 0;
         align-items: center;
         gap: 4px;
         box-sizing: border-box;
-        height: 26px;
+        min-height: 26px;
         padding: 2px 10px 2px 6px;
         border: 0;
         border-radius: 3px;
@@ -142,9 +143,21 @@ template.innerHTML = `
         display: none;
     }
 
+    .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
+
     ${MENU_STYLES}
 </style>
-<div class="bar" part="bar">
+<div class="bar" part="bar" role="region">
     <div class="tools" part="tools-start" role="toolbar">${toolMarkup(TOOLS)}</div>
     <span class="separator" aria-hidden="true"></span>
     <div class="windows" part="window-bar" role="toolbar"></div>
@@ -194,6 +207,9 @@ export class EdiromTaskbar extends HTMLElement {
         shadow.append(template.content.cloneNode(true));
 
         this.#elements = {
+            bar: shadow.querySelector('.bar'),
+            toolsStart: shadow.querySelector('[part="tools-start"]'),
+            toolsEnd: shadow.querySelector('[part="tools-end"]'),
             windowBar: shadow.querySelector('.windows'),
             clock: shadow.querySelector('.clock')
         };
@@ -210,6 +226,8 @@ export class EdiromTaskbar extends HTMLElement {
         this.#elements.windowBar.addEventListener('click', this.#onTaskClick);
         this.#elements.windowBar.addEventListener('contextmenu', this.#onTaskContextMenu);
         this.#elements.windowBar.addEventListener('keydown', this.#onTaskKeyDown);
+        // The scrollbar is hidden, so a plain mouse wheel has to scroll the window bar sideways.
+        this.#elements.windowBar.addEventListener('wheel', this.#onWindowBarWheel, { passive: false });
     }
 
     connectedCallback() {
@@ -318,6 +336,15 @@ export class EdiromTaskbar extends HTMLElement {
         buttons[(targets[event.key] + buttons.length) % buttons.length].focus();
     };
 
+    #onWindowBarWheel = (event) => {
+        const windowBar = this.#elements.windowBar;
+        if (event.deltaY === 0 || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+        if (windowBar.scrollWidth <= windowBar.clientWidth) return;
+
+        event.preventDefault();
+        windowBar.scrollLeft += event.deltaY;
+    };
+
     #openWindowMenu(button) {
         const item = this.#findWindow(button.dataset.id);
         if (!item) return;
@@ -351,7 +378,11 @@ export class EdiromTaskbar extends HTMLElement {
             }
         });
 
-        this.#elements.windowBar.setAttribute('aria-label', labels.windowBar);
+        const { bar, toolsStart, toolsEnd, windowBar } = this.#elements;
+        bar.setAttribute('aria-label', labels.taskbar);
+        toolsStart.setAttribute('aria-label', labels.windowTools);
+        toolsEnd.setAttribute('aria-label', labels.appTools);
+        windowBar.setAttribute('aria-label', labels.windowBar);
         this.#renderWindows();
     }
 
@@ -399,7 +430,7 @@ export class EdiromTaskbar extends HTMLElement {
         button.className = 'task';
         button.part = 'task-button';
         button.dataset.id = id;
-        button.setAttribute('aria-haspopup', 'menu');
+        button.setAttribute('aria-keyshortcuts', 'Shift+F10');
 
         const icon = document.createElement('edirom-icon');
         icon.setAttribute('size', '16');
@@ -408,12 +439,15 @@ export class EdiromTaskbar extends HTMLElement {
         const title = document.createElement('span');
         title.className = 'task-title';
 
-        button.append(icon, title);
+        const state = document.createElement('span');
+        state.className = 'task-state visually-hidden';
+
+        button.append(icon, title, state);
         return button;
     }
 
     #updateTaskButton(button, item) {
-        const [icon, title] = button.children;
+        const [icon, title, state] = button.children;
 
         if (item.icon) {
             icon.setAttribute('name', item.icon);
@@ -422,6 +456,8 @@ export class EdiromTaskbar extends HTMLElement {
             icon.hidden = true;
         }
         title.textContent = item.title;
+        const stateLabel = item.minimized ? this.#labels.stateMinimized : item.hidden ? this.#labels.stateHidden : '';
+        state.textContent = stateLabel ? `, ${stateLabel}` : '';
         button.title = item.title;
         button.setAttribute('aria-pressed', String(item.active));
         button.dataset.state = item.minimized ? 'minimized' : item.hidden ? 'hidden' : 'shown';

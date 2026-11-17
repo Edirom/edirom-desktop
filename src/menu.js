@@ -39,13 +39,13 @@ export const MENU_STYLES = `
         cursor: pointer;
     }
 
-    .menu-item:hover:not(:disabled),
+    .menu-item:hover:not([aria-disabled="true"]),
     .menu-item:focus-visible {
         background: var(--_ed-secondary);
         outline: none;
     }
 
-    .menu-item:disabled {
+    .menu-item[aria-disabled="true"] {
         color: #999999;
         cursor: default;
     }
@@ -66,7 +66,7 @@ export const MENU_STYLES = `
         background: #dddddd;
     }
 
-    .menu-empty {
+    .menu-item.menu-empty {
         padding: 4px 12px;
         color: var(--_ed-muted);
     }
@@ -132,8 +132,9 @@ export class PopupMenu {
         window.addEventListener('resize', this.#onViewportChange);
         window.addEventListener('blur', this.#onViewportChange);
 
-        (this.#buttons().find((b) => b.getAttribute('aria-checked') === 'true' && !b.disabled)
+        (this.#enabledButtons().find((b) => b.getAttribute('aria-checked') === 'true')
             ?? this.#enabledButtons()[0]
+            ?? this.#buttons()[0]
             ?? this.element).focus();
 
         this.onToggle(true, anchor);
@@ -163,7 +164,11 @@ export class PopupMenu {
     #renderItems() {
         if (this.#items.length === 0 && this.emptyLabel) {
             const empty = document.createElement('div');
-            empty.className = 'menu-empty';
+            empty.className = 'menu-item menu-empty';
+            empty.part = 'menu-item';
+            empty.tabIndex = -1;
+            empty.setAttribute('role', 'menuitem');
+            empty.setAttribute('aria-disabled', 'true');
             empty.textContent = this.emptyLabel;
             return [empty];
         }
@@ -182,7 +187,7 @@ export class PopupMenu {
             button.part = 'menu-item';
             button.tabIndex = -1;
             button.dataset.id = item.id;
-            button.disabled = Boolean(item.disabled);
+            if (item.disabled) button.setAttribute('aria-disabled', 'true');
 
             if (this.checkable) {
                 button.setAttribute('role', 'menuitemradio');
@@ -208,7 +213,7 @@ export class PopupMenu {
     }
 
     #enabledButtons() {
-        return this.#buttons().filter((b) => !b.disabled);
+        return this.#buttons().filter((b) => b.getAttribute('aria-disabled') !== 'true');
     }
 
     #position() {
@@ -233,7 +238,7 @@ export class PopupMenu {
 
     #onClick = (event) => {
         const button = event.target.closest('.menu-item');
-        if (!button || button.disabled) return;
+        if (!button || button.getAttribute('aria-disabled') === 'true') return;
 
         const anchor = this.#anchor;
         this.close({ restoreFocus: true });
@@ -241,7 +246,7 @@ export class PopupMenu {
     };
 
     #onKeyDown = (event) => {
-        const buttons = this.#enabledButtons();
+        const buttons = this.#buttons();
         const current = buttons.indexOf(this.element.getRootNode().activeElement);
 
         switch (event.key) {
