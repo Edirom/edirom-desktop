@@ -24,7 +24,7 @@ const END_TOOLS = [
 function toolMarkup(tools) {
     return tools.map((tool) => tool.separator
         ? '<span class="separator" aria-hidden="true"></span>'
-        : `<edirom-icon role="button" class="tool" part="tool" data-action="${tool.action}" name="${tool.icon}"${tool.pressedBy ? ' aria-pressed="false"' : ''}></edirom-icon>`
+        : `<button type="button" class="tool" part="tool" data-action="${tool.action}"${tool.pressedBy ? ' aria-pressed="false"' : ''}><edirom-icon name="${tool.icon}" aria-hidden="true"></edirom-icon></button>`
     ).join('');
 }
 
@@ -63,8 +63,33 @@ template.innerHTML = `
         gap: 2px;
     }
 
+    .tool {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        line-height: 0;
+        cursor: pointer;
+        appearance: none;
+    }
+
     .tool[hidden] {
         display: none;
+    }
+
+    .tool[aria-pressed="true"] {
+        background-color: color-mix(in oklch, var(--_ed-secondary) 88%, black);
+        box-shadow: 0 1px 1px rgba(8, 8, 8, 0.5) inset;
+    }
+
+    .tool:hover {
+        background-color: color-mix(in oklch, var(--_ed-secondary) 97%, black);
+        box-shadow: 0 1px 1px rgba(8, 8, 8, 0.45) inset;
     }
 
     .tool:focus-visible {
@@ -369,9 +394,7 @@ export class EdiromTaskbar extends HTMLElement {
             tool.setAttribute('aria-label', label);
 
             if (config.pressedBy) {
-                const pressed = this.hasAttribute(config.pressedBy);
-                toggleAttribute(tool, 'pressed', pressed);
-                tool.setAttribute('aria-pressed', String(pressed));
+                tool.setAttribute('aria-pressed', String(this.hasAttribute(config.pressedBy)));
             }
             if (config.shownBy) {
                 tool.hidden = !this.hasAttribute(config.shownBy);

@@ -55,7 +55,8 @@ template.innerHTML = `
 
     .home:focus-visible,
     .work-switch:focus-visible,
-    .search-field:focus-visible {
+    .search-field:focus-visible,
+    .search-button:focus-visible {
         outline: 2px solid var(--_ed-primary);
         outline-offset: -2px;
     }
@@ -131,6 +132,27 @@ template.innerHTML = `
         font: inherit;
     }
 
+    .search-button {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        line-height: 0;
+        cursor: pointer;
+        appearance: none;
+    }
+
+    .search-button:hover {
+        background-color: color-mix(in oklch, var(--_ed-secondary) 97%, black);
+        box-shadow: 0 1px 1px rgba(8, 8, 8, 0.45) inset;
+    }
+
     .actions {
         display: flex;
         align-items: center;
@@ -153,7 +175,7 @@ template.innerHTML = `
     </div>
     <form class="search" part="search" role="search">
         <input type="search" class="search-field" part="search-field" autocomplete="off">
-        <edirom-icon class="search-button" part="search-button" role="button" name="search"></edirom-icon>
+        <button type="submit" class="search-button" part="search-button"><edirom-icon name="search" aria-hidden="true"></edirom-icon></button>
     </form>
     <div class="actions" part="actions"><slot name="actions"></slot></div>
 </div>
@@ -210,7 +232,6 @@ export class EdiromTopbar extends HTMLElement {
             event.preventDefault();
             this.#requestSearch();
         });
-        this.#elements.searchButton.addEventListener('click', () => this.#requestSearch());
     }
 
     connectedCallback() {
