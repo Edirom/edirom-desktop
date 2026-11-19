@@ -1,6 +1,7 @@
 import { THEME_TOKENS, mergeLabels, dispatch, toggleAttribute } from './shared.js';
 import { TASKBAR_LABELS } from './labels.js';
 import { PopupMenu, MENU_STYLES } from './menu.js';
+import { RovingFocus } from './roving-focus.js';
 import { taskButtonAction, windowMenuItems, windowMenuRequest, normalizeWindows, formatClock } from './taskbar-state.js';
 
 const CLOCK_INTERVAL_MS = 10000;
@@ -224,6 +225,9 @@ export class EdiromTaskbar extends HTMLElement {
     #buttons = new Map();
     #elements;
     #windowMenu;
+    #toolsStartFocus;
+    #toolsEndFocus;
+    #windowBarFocus;
     #clockTimer = null;
 
     constructor() {
@@ -243,6 +247,11 @@ export class EdiromTaskbar extends HTMLElement {
             onSelect: (action, anchor) => this.#onWindowMenuSelect(action, anchor.dataset.id)
         });
         shadow.append(this.#windowMenu.element);
+
+        // One Tab stop per toolbar. Arrow keys move inside that toolbar.
+        this.#toolsStartFocus = new RovingFocus(this.#elements.toolsStart, '.tool');
+        this.#toolsEndFocus = new RovingFocus(this.#elements.toolsEnd, '.tool');
+        this.#windowBarFocus = new RovingFocus(this.#elements.windowBar, '.task');
 
         shadow.querySelectorAll('.tool').forEach((tool) => {
             tool.addEventListener('click', () => this.#onToolClick(tool.dataset.action));
@@ -349,16 +358,7 @@ export class EdiromTaskbar extends HTMLElement {
         if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
             event.preventDefault();
             this.#openWindowMenu(button);
-            return;
         }
-
-        const buttons = [...this.#elements.windowBar.querySelectorAll('.task')];
-        const index = buttons.indexOf(button);
-        const targets = { ArrowLeft: index - 1, ArrowRight: index + 1, Home: 0, End: buttons.length - 1 };
-        if (!(event.key in targets)) return;
-
-        event.preventDefault();
-        buttons[(targets[event.key] + buttons.length) % buttons.length].focus();
     };
 
     #onWindowBarWheel = (event) => {
@@ -386,6 +386,7 @@ export class EdiromTaskbar extends HTMLElement {
 
     #render() {
         const labels = this.#labels;
+        const focused = this.shadowRoot.activeElement;
 
         this.shadowRoot.querySelectorAll('.tool').forEach((tool) => {
             const config = [...TOOLS, ...END_TOOLS].find((t) => t.action === tool.dataset.action);
@@ -406,11 +407,14 @@ export class EdiromTaskbar extends HTMLElement {
         toolsStart.setAttribute('aria-label', labels.windowTools);
         toolsEnd.setAttribute('aria-label', labels.appTools);
         windowBar.setAttribute('aria-label', labels.windowBar);
+        this.#toolsStartFocus.sync(null, focused);
+        this.#toolsEndFocus.sync(null, focused);
         this.#renderWindows();
     }
 
     #renderWindows() {
         const windowBar = this.#elements.windowBar;
+        const focused = this.shadowRoot.activeElement;
         const seen = new Set();
 
         this.#windows.forEach((item, index) => {
@@ -435,7 +439,11 @@ export class EdiromTaskbar extends HTMLElement {
         }
 
         const active = this.#windows.find((w) => w.active);
-        if (active) this.#revealTaskButton(this.#buttons.get(active.id));
+        const activeButton = active ? this.#buttons.get(active.id) ?? null : null;
+        // The active window is the tab stop. With none active, the first button is.
+        // A focused button that was just removed gets focus back on that stop.
+        this.#windowBarFocus.sync(activeButton ?? windowBar.querySelector('.task'), focused);
+        if (activeButton) this.#revealTaskButton(activeButton);
     }
 
     #revealTaskButton(button) {
