@@ -8,6 +8,12 @@ import './edirom-taskbar.js';
 
 const ORIGIN = Object.freeze({ x: 0, y: 0 });
 
+const SORT_ANNOUNCEMENTS = Object.freeze({
+    grid: 'arrangedGrid',
+    vertical: 'arrangedVertical',
+    horizontal: 'arrangedHorizontal'
+});
+
 const template = document.createElement('template');
 template.innerHTML = `
 <style>
@@ -81,6 +87,18 @@ template.innerHTML = `
         flex: 0 1 auto;
         min-height: 0;
     }
+
+    .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
 </style>
 <edirom-topbar part="topbar"><slot name="topbar-actions" slot="actions"></slot></edirom-topbar>
 <div class="surface" part="surface">
@@ -89,6 +107,7 @@ template.innerHTML = `
     <div class="navigator" part="navigator" hidden><slot name="navigator"></slot></div>
 </div>
 <edirom-taskbar part="taskbar"></edirom-taskbar>
+<div class="visually-hidden" role="status" aria-live="polite"></div>
 `;
 
 /**
@@ -110,6 +129,7 @@ export class EdiromDesktop extends HTMLElement {
     #elements;
     #resizeObserver = null;
     #metrics = null;
+    #announceToken = 0;
 
     constructor() {
         super();
@@ -125,7 +145,8 @@ export class EdiromDesktop extends HTMLElement {
             wallpaper: shadow.querySelector('.wallpaper'),
             workspace: shadow.querySelector('.workspace'),
             navigator: shadow.querySelector('.navigator'),
-            navigatorSlot: shadow.querySelector('slot[name="navigator"]')
+            navigatorSlot: shadow.querySelector('slot[name="navigator"]'),
+            status: shadow.querySelector('[role="status"]')
         };
 
         const { topbar, taskbar, navigator, navigatorSlot } = this.#elements;
@@ -257,6 +278,23 @@ export class EdiromDesktop extends HTMLElement {
         this.#elements.topbar.focusSearch();
     }
 
+    /**
+     * Announces `message` through the polite live region.
+     * The region is cleared first and filled on the next frame, so the same text is announced again.
+     */
+    announce(message) {
+        const region = this.#elements.status;
+        const token = ++this.#announceToken;
+        region.textContent = '';
+        if (message === null || message === undefined || message === '') return;
+
+        const text = String(message);
+        requestAnimationFrame(() => {
+            if (token !== this.#announceToken) return;
+            region.textContent = text;
+        });
+    }
+
     // Internals
 
     #syncWindows() {
@@ -292,12 +330,19 @@ export class EdiromDesktop extends HTMLElement {
     #onSortRequest = (event) => {
         if (!event.detail) return;
         event.detail.rects = this.#registry.getSortRects(event.detail.mode, this.getUsableSize(), ORIGIN);
+        const key = SORT_ANNOUNCEMENTS[event.detail.mode];
+        if (key) this.announce(this.#elements.taskbar.labels[key]);
     };
 
     #onCloseRequest = (event) => {
         const detail = event.detail;
         if (!detail) return;
         detail.ids = closeRequestIds(detail.scope, detail.id, this.#registry.getAll());
+        if (detail.ids.length > 1) {
+            const message = this.#elements.taskbar.labels.windowsClosed
+                .replaceAll('{count}', String(detail.ids.length));
+            this.announce(message);
+        }
     };
 }
 
