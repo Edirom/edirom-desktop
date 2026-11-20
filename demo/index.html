@@ -166,6 +166,11 @@
             <label><input id="show-clock" type="checkbox" checked> Clock</label>
             <label><input id="show-language" type="checkbox"> Language button</label>
             <label><input id="stretch" type="checkbox"> Stretch wallpaper</label>
+            <select id="works-mode" aria-label="Works">
+                <option value="several">Several works (dropdown)</option>
+                <option value="one">One work (title)</option>
+                <option value="none">No works</option>
+            </select>
             <select id="wallpaper" aria-label="Wallpaper">
                 <option value="">Default background</option>
                 <option value="wallpaper.svg">Tiled pattern</option>
@@ -192,15 +197,27 @@
         const windowElements = new Map();
         let zIndex = 0;
 
+        const WORKS = [
+            { id: 'freischuetz', title: 'Der Freischütz' },
+            { id: 'oberon', title: 'Oberon' },
+            { id: 'euryanthe', title: 'Euryanthe' }
+        ];
+
         const GERMAN = {
-            home: 'Startseite', workSwitch: 'Werk auswählen', searchField: 'Suchbegriff', search: 'Suchen',
+            workspace: 'Arbeitsfläche',
+            topbar: 'Kopfleiste', home: 'Startseite', homeLabel: 'Edirom Online',
+            workSwitch: 'Werk auswählen', noWorks: 'Keine Werke verfügbar',
+            searchField: 'Suchbegriff', search: 'Suchen',
+            taskbar: 'Taskleiste', windowTools: 'Fensterwerkzeuge', appTools: 'Hilfe und Einstellungen',
             sortGrid: 'Fenster im Raster anordnen', sortVertical: 'Fenster untereinander anordnen',
             sortHorizontal: 'Fenster nebeneinander anordnen', showMeasures: 'Taktzahlen anzeigen',
             showAnnotations: 'Anmerkungen anzeigen', concordanceNav: 'Konkordanznavigator',
             windowBar: 'Geöffnete Fenster', about: 'Über', help: 'Hilfe', languageSwitch: 'Sprache wechseln',
             windowMenu: 'Fensteraktionen', restore: 'Wiederherstellen', minimize: 'Minimieren',
             maximize: 'Maximieren', close: 'Schließen', closeOther: 'Andere Fenster schließen',
-            closeAll: 'Alle Fenster schließen'
+            closeAll: 'Alle Fenster schließen', stateMinimized: 'minimiert', stateHidden: 'ausgeblendet',
+            arrangedGrid: 'Fenster im Raster angeordnet', arrangedVertical: 'Fenster untereinander angeordnet',
+            arrangedHorizontal: 'Fenster nebeneinander angeordnet', windowsClosed: '{count} Fenster geschlossen'
         };
 
         const EVENTS = [
@@ -211,15 +228,33 @@
             'window-maximize-request', 'window-close-request', 'active-window-change'
         ];
 
-        for (const type of EVENTS) {
-            document.addEventListener(type, (event) => {
-                const item = document.createElement('li');
-                const name = document.createElement('b');
-                name.textContent = type;
-                item.append(name, ' ', event.detail === null ? '' : JSON.stringify(event.detail));
-                log.prepend(item);
-            });
+        function logEntry(name, detail) {
+            const item = document.createElement('li');
+            const label = document.createElement('b');
+            label.textContent = name;
+            const text = detail === null || detail === undefined || detail === ''
+                ? ''
+                : typeof detail === 'string' ? detail : JSON.stringify(detail);
+            item.append(label, ' ', text);
+            log.prepend(item);
         }
+
+        for (const type of EVENTS) {
+            document.addEventListener(type, (event) => logEntry(type, event.detail));
+        }
+
+        const status = desktop.shadowRoot.querySelector('[role="status"]');
+        let lastAnnouncement = '';
+        new MutationObserver(() => {
+            const text = status.textContent;
+            if (!text) {
+                lastAnnouncement = '';
+                return;
+            }
+            if (text === lastAnnouncement) return;
+            lastAnnouncement = text;
+            logEntry('announce', text);
+        }).observe(status, { childList: true, characterData: true, subtree: true });
 
         desktop.addEventListener('desktop-resize', (event) => {
             document.getElementById('metrics').textContent = JSON.stringify(event.detail, null, 1);
@@ -327,6 +362,12 @@
             else desktop.append(navigator);
         });
         document.getElementById('clear-log').addEventListener('click', () => log.replaceChildren());
+        document.getElementById('works-mode').addEventListener('change', (e) => {
+            const list = e.target.value === 'none' ? [] : e.target.value === 'one' ? WORKS.slice(0, 1) : WORKS;
+            desktop.works = list;
+            if (list.length === 0) desktop.activeWork = null;
+            else if (!list.some((work) => work.id === desktop.activeWork)) desktop.activeWork = list[0].id;
+        });
         document.getElementById('show-clock').addEventListener('change', (e) => { desktop.showClock = e.target.checked; });
         document.getElementById('show-language').addEventListener('change', (e) => desktop.toggleAttribute('show-language-switch', e.target.checked));
         document.getElementById('stretch').addEventListener('change', (e) => { desktop.wallpaperStretch = e.target.checked; });
