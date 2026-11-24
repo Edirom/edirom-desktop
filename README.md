@@ -2,8 +2,6 @@
 
 Desktop shell for Edirom Online as web components: `<edirom-desktop>`, `<edirom-topbar>` and `<edirom-taskbar>`. It replaces the ExtJS desktop (`app/view/desktop/*`) of Edirom-Online-Frontend. Windows and the navigator are not part of this package; they are placed into slots and register with the desktop.
 
-> **Status:** phase 3. Layout math, window registry, `<edirom-topbar>`, `<edirom-taskbar>` and the `<edirom-desktop>` shell are done.
-
 ## Usage
 
 ```html
