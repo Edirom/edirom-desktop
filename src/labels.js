@@ -7,7 +7,6 @@ export const TOPBAR_LABELS = Object.freeze({
     home: 'Home',
     homeLabel: 'Edirom Online',
     workSwitch: 'Select work',
-    noWorks: 'No works available',
     searchField: 'Search term',
     search: 'Search'
 });

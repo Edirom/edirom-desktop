@@ -2,7 +2,7 @@
 
 Desktop shell for Edirom Online as web components: `<edirom-desktop>`, `<edirom-topbar>` and `<edirom-taskbar>`. It replaces the ExtJS desktop (`app/view/desktop/*`) of Edirom-Online-Frontend. Windows and the navigator are not part of this package; they are placed into slots and register with the desktop.
 
-> **Status:** phase 3. Layout math, window registry, `<edirom-topbar>`, `<edirom-taskbar>` and the `<edirom-desktop>` shell are done; integration into Edirom-Online-Frontend follows.
+> **Status:** phase 3. Layout math, window registry, `<edirom-topbar>`, `<edirom-taskbar>` and the `<edirom-desktop>` shell are done.
 
 ## Usage
 
@@ -158,7 +158,7 @@ English defaults; pass translations through the `labels` attribute or property. 
 | Element | Keys |
 |---|---|
 | `<edirom-desktop>` | `workspace` |
-| `<edirom-topbar>` | `topbar`, `home`, `homeLabel`, `workSwitch`, `noWorks`, `searchField`, `search` |
+| `<edirom-topbar>` | `topbar`, `home`, `homeLabel`, `workSwitch`, `searchField`, `search` |
 | `<edirom-taskbar>` | `taskbar`, `windowTools`, `appTools`, `sortGrid`, `sortVertical`, `sortHorizontal`, `showMeasures`, `showAnnotations`, `concordanceNav`, `windowBar`, `about`, `help`, `languageSwitch`, `windowMenu`, `restore`, `minimize`, `maximize`, `close`, `closeOther`, `closeAll`, `stateMinimized`, `stateHidden`, `arrangedGrid`, `arrangedVertical`, `arrangedHorizontal`, `windowsClosed` |
 
 `workspace` names the main landmark. `topbar`, `taskbar`, `windowTools`, `appTools` and `windowBar` name the banner, the task bar region and its toolbars. `stateMinimized` and `stateHidden` are added to a task button's accessible name. `arrangedGrid`, `arrangedVertical`, `arrangedHorizontal` and `windowsClosed` are the live announcements; `windowsClosed` may contain `{count}`.
