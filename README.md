@@ -2,8 +2,6 @@
 
 Desktop shell for Edirom Online as web components: `<edirom-desktop>`, `<edirom-topbar>` and `<edirom-taskbar>`. It replaces the ExtJS desktop (`app/view/desktop/*`) of Edirom-Online-Frontend. Windows and the navigator are not part of this package; they are placed into slots and register with the desktop.
 
-> **Status:** phase 3. Layout math, window registry, `<edirom-topbar>`, `<edirom-taskbar>` and the `<edirom-desktop>` shell are done; integration into Edirom-Online-Frontend follows.
-
 ## Usage
 
 ```html
@@ -25,9 +23,10 @@ All events are `CustomEvent`s with `bubbles` and `composed`, so they can be hand
 
 ## Development
 
-No dependencies; Node 20 or newer is enough.
+Node 20 or newer. The ARIA contract test needs the `jsdom` dev dependency.
 
 ```sh
+npm install
 npm test                          # unit tests
 python3 -m http.server 8090       # then open http://localhost:8090/demo/
 ```
@@ -44,7 +43,7 @@ Window content is never moved into the shadow DOM. Windows live in the light-DOM
 |---|---|---|
 | `wallpaper` | `wallpaper` | Image URL drawn over the background. Tiled unless `wallpaper-stretch` is set. Without it the default gradient of the Edirom theme shows. |
 | `wallpaper-stretch` | `wallpaperStretch` | Stretches the wallpaper to the surface. |
-| `labels` | `labels` | JSON object with labels for both bars; each bar picks its [keys](#labels). |
+| `labels` | `labels` | JSON object with labels for the desktop and both bars; each one picks its [keys](#labels). |
 | `lang` | `lang` | Language of the clock. Falls back to the nearest `lang` of an ancestor when the desktop is connected. |
 | `works` | `works` | Passed to the top bar. |
 | `active-work` | `activeWork` | Passed to the top bar; updated when the user picks a work. |
@@ -82,6 +81,7 @@ Layout methods, identical to the ExtJS desktop:
 | `getLayout(mode, count)` | `count` tiling rects for `grid`, `vertical` or `horizontal`. |
 | `getTopBarHeight()`, `getTaskBarHeight()` | Bar heights in pixels. |
 | `focusSearch()` | Moves focus to the search field. |
+| `announce(message)` | Writes `message` to a visually hidden polite live region (`role="status"`) on the next frame, so the same text is announced again. Arranging windows announces `arrangedGrid`, `arrangedVertical` or `arrangedHorizontal`. Closing more than one window announces `windowsClosed`, with `{count}` replaced by how many close. |
 
 All events of both bars bubble through the desktop unchanged, with two additions to the details:
 
@@ -94,7 +94,7 @@ All events of both bars bubble through the desktop unchanged, with two additions
 
 ## `<edirom-topbar>`
 
-Home button, work switcher, search field and a slot for further actions.
+Home button, work switcher, search field and a slot for further actions. The search control is a native `<button type="submit">` (`part="search-button"`). The icon inside it is `aria-hidden`; the button's name is the `search` label.
 
 | Attribute | Property | Description |
 |---|---|---|
@@ -117,11 +117,11 @@ Home button, work switcher, search field and a slot for further actions.
 |---|---|---|
 | `home-request` | `null` | The home button was clicked. |
 | `work-select` | `{ workId, previousWorkId }` | The user picked a different work. `active-work` is already updated. |
-| `search-request` | `{ term }` | Enter in the search field or click on the search icon. `term` is the raw field value and may be empty. |
+| `search-request` | `{ term }` | Enter in the search field or the search button. `term` is the raw field value and may be empty. |
 
 ## `<edirom-taskbar>`
 
-Window arrangement and global toggles on the left, one button per window in the middle, about/help and an optional clock on the right.
+Window arrangement and global toggles on the left, one button per window in the middle, about/help and an optional clock on the right. Each tool is a native `<button type="button">` (`part="tool"`) with an `aria-hidden` icon. Toggles expose their state with `aria-pressed`.
 
 | Attribute | Property | Description |
 |---|---|---|
@@ -147,7 +147,7 @@ Window arrangement and global toggles on the left, one button per window in the 
 | `window-maximize-request` | `{ id }` | "Maximize" in the window menu. |
 | `window-close-request` | `{ scope, id, ids }` | "Close", "Close other windows" or "Close all windows". `scope` is `window`, `others` or `all`; `ids` lists the affected task buttons. Windows without a task button are the host's decision. |
 
-The window menu opens on right click, the context menu key or Shift+F10 on a task button. The arrow keys move between task buttons.
+The three toolbars (window tools, open windows, help and settings) each keep a single Tab stop. ArrowLeft and ArrowRight move inside the current toolbar and wrap. Home and End move to the first and last visible button. Buttons with the `hidden` attribute are skipped. In the window bar the active window's button is the Tab stop, or the first button when no window is active. The window menu opens on right click, the context menu key or Shift+F10 on a task button. Task buttons expose that shortcut with `aria-keyshortcuts="Shift+F10"`.
 
 ## Labels
 
@@ -155,8 +155,11 @@ English defaults; pass translations through the `labels` attribute or property. 
 
 | Element | Keys |
 |---|---|
-| `<edirom-topbar>` | `home`, `homeLabel`, `workSwitch`, `noWorks`, `searchField`, `search` |
-| `<edirom-taskbar>` | `sortGrid`, `sortVertical`, `sortHorizontal`, `showMeasures`, `showAnnotations`, `concordanceNav`, `windowBar`, `about`, `help`, `languageSwitch`, `windowMenu`, `restore`, `minimize`, `maximize`, `close`, `closeOther`, `closeAll` |
+| `<edirom-desktop>` | `workspace` |
+| `<edirom-topbar>` | `topbar`, `home`, `homeLabel`, `workSwitch`, `searchField`, `search` |
+| `<edirom-taskbar>` | `taskbar`, `windowTools`, `appTools`, `sortGrid`, `sortVertical`, `sortHorizontal`, `showMeasures`, `showAnnotations`, `concordanceNav`, `windowBar`, `about`, `help`, `languageSwitch`, `windowMenu`, `restore`, `minimize`, `maximize`, `close`, `closeOther`, `closeAll`, `stateMinimized`, `stateHidden`, `arrangedGrid`, `arrangedVertical`, `arrangedHorizontal`, `windowsClosed` |
+
+`workspace` names the main landmark. `topbar`, `taskbar`, `windowTools`, `appTools` and `windowBar` name the banner, the task bar region and its toolbars. `stateMinimized` and `stateHidden` are added to a task button's accessible name. `arrangedGrid`, `arrangedVertical`, `arrangedHorizontal` and `windowsClosed` are the live announcements; `windowsClosed` may contain `{count}`.
 
 ## Styling
 
@@ -175,7 +178,7 @@ English defaults; pass translations through the `labels` attribute or property. 
 
 Parts of `<edirom-desktop>`: `topbar`, `surface`, `wallpaper`, `workspace`, `navigator`, `taskbar`. The surface is its own stacking context, so window z-indices never cover the bars or their menus.
 
-Parts of the bars: `bar`, `home-button`, `home-label`, `work-switch`, `search`, `search-field`, `search-button`, `actions`, `tools-start`, `tools-end`, `tool`, `window-bar`, `task-button`, `clock`, `menu`, `menu-item`.
+Parts of the bars: `bar`, `home-button`, `home-label`, `work-switch`, `search`, `search-field`, `search-button`, `actions`, `tools-start`, `tools-end`, `tool`, `window-bar`, `task-button`, `clock`, `menu`, `menu-item`. `search-button` and `tool` are native buttons; the `<edirom-icon>` inside them is `aria-hidden`.
 
 ## Layout (`src/layout.js`)
 

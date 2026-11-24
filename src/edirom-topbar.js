@@ -1,6 +1,5 @@
 import { THEME_TOKENS, mergeLabels, normalizeWorks, dispatch } from './shared.js';
 import { TOPBAR_LABELS } from './labels.js';
-import { PopupMenu, MENU_STYLES } from './menu.js';
 
 const template = document.createElement('template');
 template.innerHTML = `
@@ -54,7 +53,7 @@ template.innerHTML = `
     }
 
     .home:focus-visible,
-    .work-switch:focus-visible,
+    select.work-title:focus-visible,
     .search-field:focus-visible,
     .search-button:focus-visible {
         outline: 2px solid var(--_ed-primary);
@@ -85,33 +84,18 @@ template.innerHTML = `
         border-right: 1px solid #e6e6e6;
     }
 
-    .work-switch {
-        display: flex;
-        align-items: center;
-        gap: 6px;
+    .work-title {
         min-width: 0;
         max-width: 40ch;
-        min-height: 24px;
-        padding: 0 6px 0 8px;
-        border: 1px solid #949393;
-        border-radius: 3px;
-        background: linear-gradient(#dddddd, #c3c3c3 30%, #b8b8b8 65%, #a0a0a0);
-        color: inherit;
-        font: inherit;
-        cursor: pointer;
-    }
-
-    .work-title {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .caret {
-        flex: 0 0 auto;
-        margin-top: 4px;
-        border: 4px solid transparent;
-        border-top-color: currentColor;
+    select.work-title {
+        max-width: 40ch;
+        font: inherit;
+        color: inherit;
     }
 
     .search {
@@ -159,7 +143,6 @@ template.innerHTML = `
         gap: 4px;
     }
 
-    ${MENU_STYLES}
 </style>
 <div class="bar" part="bar" role="banner">
     <div class="start">
@@ -168,10 +151,7 @@ template.innerHTML = `
         </button>
         <span class="home-label" part="home-label"></span>
         <span class="separator" aria-hidden="true"></span>
-        <button type="button" class="work-switch" part="work-switch" aria-haspopup="menu" aria-expanded="false">
-            <span class="work-title"></span>
-            <span class="caret" aria-hidden="true"></span>
-        </button>
+        <span class="work-title" part="work-switch" hidden></span>
     </div>
     <form class="search" part="search" role="search">
         <input type="search" class="search-field" part="search-field" autocomplete="off">
@@ -185,6 +165,8 @@ template.innerHTML = `
  * Top bar of the Edirom desktop: home button, work switcher, search field and
  * a slot for further actions (e.g. the connected workspace).
  *
+ * One entry is plain text. Several entries are a native select. The list is hidden when empty.
+ *
  * Events: `home-request`, `work-select` ({ workId, previousWorkId }),
  * `search-request` ({ term }).
  */
@@ -194,7 +176,6 @@ export class EdiromTopbar extends HTMLElement {
     #labels = { ...TOPBAR_LABELS };
     #works = [];
     #elements;
-    #workMenu;
 
     constructor() {
         super();
@@ -206,28 +187,14 @@ export class EdiromTopbar extends HTMLElement {
             home: shadow.querySelector('.home'),
             homeLabel: shadow.querySelector('.home-label'),
             logoSlot: shadow.querySelector('slot[name="logo"]'),
-            workSwitch: shadow.querySelector('.work-switch'),
-            workTitle: shadow.querySelector('.work-title'),
+            separator: shadow.querySelector('.separator'),
+            workSwitch: shadow.querySelector('.work-title'),
             search: shadow.querySelector('.search'),
             searchField: shadow.querySelector('.search-field'),
             searchButton: shadow.querySelector('.search-button')
         };
 
-        this.#workMenu = new PopupMenu({
-            checkable: true,
-            onSelect: (workId) => this.#selectWork(workId),
-            onToggle: (open) => this.#elements.workSwitch.setAttribute('aria-expanded', String(open))
-        });
-        shadow.append(this.#workMenu.element);
-
         this.#elements.home.addEventListener('click', () => dispatch(this, 'home-request'));
-        this.#elements.workSwitch.addEventListener('click', () => this.#workMenu.toggle(this.#elements.workSwitch));
-        this.#elements.workSwitch.addEventListener('keydown', (event) => {
-            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                event.preventDefault();
-                this.#workMenu.open(this.#elements.workSwitch);
-            }
-        });
         this.#elements.search.addEventListener('submit', (event) => {
             event.preventDefault();
             this.#requestSearch();
@@ -236,10 +203,6 @@ export class EdiromTopbar extends HTMLElement {
 
     connectedCallback() {
         this.#render();
-    }
-
-    disconnectedCallback() {
-        this.#workMenu.close();
     }
 
     attributeChangedCallback(name, oldValue, newValue) {
@@ -293,6 +256,32 @@ export class EdiromTopbar extends HTMLElement {
         this.#elements.searchField.focus();
     }
 
+    /** One `work-title`: a span for a single work, a select when there are several. */
+    #workElement(multiple) {
+        const current = this.#elements.workSwitch;
+        if ((current.tagName === 'SELECT') === multiple) return current;
+
+        const next = multiple ? this.#createWorkSelect() : this.#createWorkTitle();
+        current.replaceWith(next);
+        this.#elements.workSwitch = next;
+        return next;
+    }
+
+    #createWorkTitle() {
+        const title = document.createElement('span');
+        title.className = 'work-title';
+        title.part = 'work-switch';
+        return title;
+    }
+
+    #createWorkSelect() {
+        const select = document.createElement('select');
+        select.className = 'work-title';
+        select.part = 'work-switch';
+        select.addEventListener('change', () => this.#selectWork(select.value));
+        return select;
+    }
+
     #selectWork(workId) {
         const previousWorkId = this.activeWork;
         if (workId === previousWorkId) return;
@@ -307,7 +296,7 @@ export class EdiromTopbar extends HTMLElement {
 
     #render() {
         const labels = this.#labels;
-        const { bar, home, homeLabel, logoSlot, workSwitch, workTitle, searchField, searchButton } = this.#elements;
+        const { bar, home, homeLabel, logoSlot, separator, searchField, searchButton } = this.#elements;
 
         bar.setAttribute('aria-label', labels.topbar);
         home.setAttribute('aria-label', labels.home);
@@ -326,22 +315,31 @@ export class EdiromTopbar extends HTMLElement {
             logoSlot.replaceChildren(icon);
         }
 
-        const activeWork = this.activeWork;
-        const active = this.#works.find((work) => work.id === activeWork);
-        workTitle.textContent = active ? active.title : labels.workSwitch;
-        workSwitch.title = labels.workSwitch;
-        if (active) workSwitch.setAttribute('aria-label', `${labels.workSwitch}: ${active.title}`);
-        else workSwitch.removeAttribute('aria-label');
-        workSwitch.hidden = this.#works.length === 0;
-        this.shadowRoot.querySelector('.separator').hidden = this.#works.length === 0;
+        const choices = this.#works;
+        const multiple = choices.length > 1;
+        const active = choices.find((work) => work.id === this.activeWork) ?? (choices.length === 1 ? choices[0] : null);
 
-        this.#workMenu.setLabel(labels.workSwitch);
-        this.#workMenu.emptyLabel = labels.noWorks;
-        this.#workMenu.setItems(this.#works.map((work) => ({
-            id: work.id,
-            label: work.title,
-            checked: work.id === activeWork
-        })));
+        separator.hidden = choices.length === 0;
+
+        const workSwitch = this.#workElement(multiple);
+        workSwitch.hidden = choices.length === 0;
+
+        if (multiple) {
+            const signature = JSON.stringify(choices);
+            if (workSwitch.dataset.works !== signature) {
+                workSwitch.replaceChildren(...choices.map((work) => {
+                    const option = document.createElement('option');
+                    option.value = work.id;
+                    option.textContent = work.title;
+                    return option;
+                }));
+                workSwitch.dataset.works = signature;
+            }
+            if (active) workSwitch.value = active.id;
+            workSwitch.setAttribute('aria-label', labels.workSwitch);
+        } else {
+            workSwitch.textContent = active ? active.title : '';
+        }
 
         searchField.placeholder = labels.searchField;
         searchField.setAttribute('aria-label', labels.searchField);
